@@ -23,7 +23,7 @@ import urllib.request
 import os
 import sys
 
-# ── mediapipe new-style imports ───────────────────────────────────────────────
+
 import mediapipe as mp
 from mediapipe.tasks                import python as mp_python
 from mediapipe.tasks.python         import BaseOptions
@@ -32,7 +32,7 @@ from mediapipe.tasks.python.vision  import (
     RunningMode, HandLandmarksConnections,
 )
 
-# ── Constants ─────────────────────────────────────────────────────────────────
+
 MODEL_URL  = ("https://storage.googleapis.com/mediapipe-models/"
               "hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task")
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -40,7 +40,7 @@ MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 BRUSH_SIZE   = 8
 ERASER_SIZE  = 50
-SMOOTHING    = 0.35          # lower = more responsive, higher = smoother
+SMOOTHING    = 0.35          
 
 PALETTE = [
     ("Red",    (0,   0,   220)),
@@ -58,8 +58,7 @@ SWATCH_W, SWATCH_H = 50, 40
 SWATCH_GAP         = 6
 BAR_H              = 70
 
-# Landmark indices
-TIP_IDS  = [4, 8, 12, 16, 20]   # thumb, index, middle, ring, pinky
+TIP_IDS  = [4, 8, 12, 16, 20]   
 PIP_IDS  = [2, 6, 10, 14, 18]
 
 
@@ -86,7 +85,7 @@ def ensure_model():
 def fingers_up(lms, is_right: bool):
     """Return [thumb, index, middle, ring, pinky] — 1 = extended."""
     up = []
-    # Thumb: compare x (mirrored camera, so left/right swapped)
+    
     if is_right:
         up.append(1 if lms[4].x < lms[3].x else 0)
     else:
@@ -120,7 +119,6 @@ def rounded_rect(img, x1, y1, x2, y2, r, color, thickness=-1):
 # ── UI overlay ────────────────────────────────────────────────────────────────
 def draw_ui(frame, color_idx, mode):
     h, w = frame.shape[:2]
-    # semi-transparent top bar
     bar_bg = frame.copy()
     cv2.rectangle(bar_bg, (0, 0), (w, BAR_H), (20, 20, 20), -1)
     cv2.addWeighted(bar_bg, 0.75, frame, 0.25, 0, frame)
@@ -139,7 +137,6 @@ def draw_ui(frame, color_idx, mode):
     cv2.putText(frame, label, (w - tw - 14, BAR_H//2 + th//2),
                 font, 0.65, (210, 210, 210), 2, cv2.LINE_AA)
 
-    # bottom legend
     legend = [
         "Q = quit",
         "Hover index over bar = pick colour",
@@ -152,7 +149,7 @@ def draw_ui(frame, color_idx, mode):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.48, (150,150,150), 1, cv2.LINE_AA)
 
 
-# ── Hand skeleton ─────────────────────────────────────────────────────────────
+
 CONNECTIONS = [(c.start, c.end) for c in HandLandmarksConnections.HAND_CONNECTIONS]
 
 def draw_skeleton(frame, lms, w, h):
@@ -164,7 +161,6 @@ def draw_skeleton(frame, lms, w, h):
         cv2.circle(frame, pt, 4, (60,200,60), 1)
 
 
-# ── Smooth point ──────────────────────────────────────────────────────────────
 def smooth(prev, raw):
     if prev is None:
         return raw
@@ -174,7 +170,6 @@ def smooth(prev, raw):
     )
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     ensure_model()
 
@@ -196,7 +191,7 @@ def main():
     mode       = "IDLE"
     last_clear = 0
 
-    # Async result container
+
     latest: list = [None]
 
     def on_result(result: HandLandmarkerResult, _img, _ts):
@@ -219,7 +214,7 @@ def main():
             if not ret:
                 break
             frame  = cv2.flip(frame, 1)
-            ts_ms += 33   # monotonically increasing timestamp
+            ts_ms += 33   
 
             mp_img = mp.Image(
                 image_format=mp.ImageFormat.SRGB,
@@ -232,16 +227,14 @@ def main():
 
             if result and result.hand_landmarks:
                 lms        = result.hand_landmarks[0]
-                hand_label = result.handedness[0][0].category_name  # "Left"/"Right"
+                hand_label = result.handedness[0][0].category_name
                 is_right   = (hand_label == "Right")
 
                 draw_skeleton(frame, lms, w, h)
                 up = fingers_up(lms, is_right)
 
-                # Index fingertip in pixel coords
                 tip8 = (int(lms[8].x * w), int(lms[8].y * h))
 
-                # ── CLEAR: thumb only ─────────────────────────────────────
                 if up == [1, 0, 0, 0, 0]:
                     now = time.time()
                     if now - last_clear > 1.0:
@@ -251,7 +244,6 @@ def main():
                     prev_pt   = None
                     smooth_pt = None
 
-                # ── ERASE: index + middle ─────────────────────────────────
                 elif up[1] and up[2]:
                     cur_mode  = "ERASE"
                     smooth_pt = smooth(smooth_pt, tip8)
@@ -260,12 +252,11 @@ def main():
                         cv2.circle(frame,  smooth_pt, ERASER_SIZE, (180,180,180), 2)
                     prev_pt = None
 
-                # ── DRAW: index only ──────────────────────────────────────
                 elif up[1] and not up[2]:
                     cur_mode  = "DRAW"
                     smooth_pt = smooth(smooth_pt, tip8)
 
-                    if smooth_pt[1] < BAR_H:           # toolbar area
+                    if smooth_pt[1] < BAR_H:
                         idx = hit_swatch(*smooth_pt)
                         if idx is not None:
                             color_idx = idx
@@ -289,7 +280,6 @@ def main():
 
             mode = cur_mode
 
-            # ── Merge canvas + frame ──────────────────────────────────────
             gray = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
             _, mask = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY)
             inv  = cv2.bitwise_not(mask)
