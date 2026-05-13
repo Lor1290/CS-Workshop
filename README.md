@@ -40,7 +40,7 @@ wget "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landm
 ### 3 · Avvia
 
 ```bash
-python hand_draw.py
+python main.py
 ```
 
 ---
